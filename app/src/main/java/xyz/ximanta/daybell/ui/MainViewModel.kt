@@ -18,7 +18,7 @@ import java.util.Calendar
 class MainViewModel(
     private val repository: TaskRepository,
     private val settingsDataStore: SettingsDataStore,
-    private val categoryDao: CategoryDao // Added for CategoriesScreen
+    private val categoryDao: CategoryDao
 ) : ViewModel() {
 
     val userPreferences: StateFlow<UserPreferences> = settingsDataStore.userPreferencesFlow
@@ -56,7 +56,6 @@ class MainViewModel(
             initialValue = emptyList()
         )
 
-    // Filter active tasks specifically for today
     val todayTasks: StateFlow<List<Task>> = activeTasks.map { tasks ->
         val startOfDay = getStartOfToday()
         val endOfDay = getEndOfToday()
@@ -67,7 +66,6 @@ class MainViewModel(
         initialValue = emptyList()
     )
 
-    // Filter active tasks specifically for upcoming (future) dates
     val upcomingTasks: StateFlow<List<Task>> = activeTasks.map { tasks ->
         val endOfDay = getEndOfToday()
         tasks.filter { it.dateTime > endOfDay }
@@ -119,6 +117,7 @@ class MainViewModel(
         }
     }
 
+    // --- Settings Updates ---
     fun updateThemeMode(themeMode: String) {
         viewModelScope.launch {
             settingsDataStore.updateThemeMode(themeMode)
@@ -140,6 +139,25 @@ class MainViewModel(
     fun updateWeekStartDay(day: Int) {
         viewModelScope.launch {
             settingsDataStore.updateWeekStartDay(day)
+        }
+    }
+
+    // FIXED: Added missing bridge functions for SettingsScreen
+    fun updateAutoRolloverOverdue(enabled: Boolean) {
+        viewModelScope.launch {
+            settingsDataStore.updateAutoRolloverOverdue(enabled)
+        }
+    }
+
+    fun updateDefaultReminderTime(hour: Int, minute: Int) {
+        viewModelScope.launch {
+            settingsDataStore.updateDefaultReminderTime(hour, minute)
+        }
+    }
+
+    fun updateDefaultAlertSound(soundUri: String) {
+        viewModelScope.launch {
+            settingsDataStore.updateDefaultAlertSound(soundUri)
         }
     }
 
