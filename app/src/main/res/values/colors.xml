@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Core Brand Tokens -->
+    <color name="graphite">#101820</color>
+    <color name="neon_teal">#48E0D0</color>
+    <color name="soft_violet">#A78BFA</color>
+    <color name="cloud_text">#F1F5F9</color>
+
+    <!-- Light Theme Variants -->
+    <color name="surface_light">#F8FAFC</color>
+    <color name="teal_deep">#0B7A72</color>
+    <color name="violet_light">#6D4FD1</color>
+    <color name="graphite_muted">#44515E</color>
+
+    <!-- Standard Colors -->
+    <color name="white">#FFFFFF</color>
+    <color name="black">#000000</color>
+</resources>
