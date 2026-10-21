@@ -1,12 +1,15 @@
 package xyz.ximanta.daybell.ui.screens
 
 import android.app.AlarmManager
+import android.app.TimePickerDialog
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
 import android.os.PowerManager
 import android.provider.Settings
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -23,6 +26,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Error
+import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -30,6 +34,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
@@ -43,7 +48,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -51,6 +55,7 @@ import androidx.core.app.NotificationManagerCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import xyz.ximanta.daybell.ui.MainViewModel
 import xyz.ximanta.daybell.ui.theme.NeonTeal
+import java.util.Calendar
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -64,6 +69,21 @@ fun SettingsScreen(
     var showThemeDialog by remember { mutableStateOf(false) }
     var showSnoozeDialog by remember { mutableStateOf(false) }
     var showWeekStartDialog by remember { mutableStateOf(false) }
+    var showDefaultTimeDialog by remember { mutableStateOf(false) }
+    var showAlertSoundDialog by remember { mutableStateOf(false) }
+
+    // FIXED: File pickers for Backup & Restore
+    val exportLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.CreateDocument("application/json")
+    ) { uri: Uri? ->
+        uri?.let { viewModel.exportData(it) }
+    }
+
+    val importLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument()
+    ) { uri: Uri? ->
+        uri?.let { viewModel.importData(it) }
+    }
 
     // Permission Checks
     val hasNotificationPermission = NotificationManagerCompat.from(context).areNotificationsEnabled()
@@ -162,6 +182,18 @@ fun SettingsScreen(
             // --- REMINDERS SECTION ---
             SettingsSection(title = "Reminders") {
                 SettingsRow(
+                    title = "Default Reminder Time",
+                    subtitle = String.format("%02d:%02d", prefs.defaultReminderHour, prefs.defaultReminderMinute),
+                    onClick = { showDefaultTimeDialog = true }
+                )
+                HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+                SettingsRow(
+                    title = "Default Alert Sound",
+                    subtitle = prefs.defaultAlertSound,
+                    onClick = { showAlertSoundDialog = true }
+                )
+                HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+                SettingsRow(
                     title = "Default Snooze Time",
                     subtitle = "${prefs.snoozeDuration} minutes",
                     onClick = { showSnoozeDialog = true }
@@ -177,30 +209,52 @@ fun SettingsScreen(
                     title = "Auto-Rollover Overdue",
                     subtitle = "Move missed tasks to today",
                     checked = prefs.autoRolloverOverdue,
-                    // FIXED: Wired up the callback to actually persist the setting
                     onCheckedChange = { viewModel.updateAutoRolloverOverdue(it) }
                 )
+            }
+
+            // --- DATA & BACKUP SECTION (FIXED: Added Export/Import UI) ---
+            SettingsSection(title = "Data & Backup") {
+                Text(
+                    text = "Export your tasks and categories to a local file, or restore them from a previous backup.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(bottom = 12.dp)
+                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Button(
+                        modifier = Modifier.weight(1f),
+                        onClick = { exportLauncher.launch("daybell_backup.json") }
+                    ) {
+                        Text("Export Data")
+                    }
+                    OutlinedButton(
+                        modifier = Modifier.weight(1f),
+                        onClick = { importLauncher.launch(arrayOf("application/json")) }
+                    ) {
+                        Text("Import Data")
+                    }
+                }
             }
 
             Spacer(modifier = Modifier.height(32.dp))
         }
     }
 
-    // Theme Picker Dialog
+    // Dialogs
     if (showThemeDialog) {
         SelectionDialog(
             title = "Choose Theme",
             options = listOf("SYSTEM", "LIGHT", "DARK"),
             selectedOption = prefs.themeMode,
-            onOptionSelected = {
-                viewModel.updateThemeMode(it)
-                showThemeDialog = false
-            },
+            onOptionSelected = { viewModel.updateThemeMode(it); showThemeDialog = false },
             onDismiss = { showThemeDialog = false }
         )
     }
 
-    // Snooze Picker Dialog
     if (showSnoozeDialog) {
         val snoozeOptions = listOf(5, 10, 15, 20, 30)
         SelectionDialog(
@@ -208,27 +262,52 @@ fun SettingsScreen(
             options = snoozeOptions.map { "$it minutes" },
             selectedOption = "${prefs.snoozeDuration} minutes",
             onOptionSelected = {
-                val minutes = it.replace(" minutes", "").toInt()
-                viewModel.updateSnoozeDuration(minutes)
+                viewModel.updateSnoozeDuration(it.replace(" minutes", "").toInt())
                 showSnoozeDialog = false
             },
             onDismiss = { showSnoozeDialog = false }
         )
     }
 
-    // Week Start Picker Dialog
     if (showWeekStartDialog) {
         SelectionDialog(
             title = "Start of Week",
             options = listOf("Monday", "Sunday"),
             selectedOption = if (prefs.weekStartDay == 1) "Monday" else "Sunday",
             onOptionSelected = {
-                val day = if (it == "Monday") 1 else 7
-                viewModel.updateWeekStartDay(day)
+                viewModel.updateWeekStartDay(if (it == "Monday") 1 else 7)
                 showWeekStartDialog = false
             },
             onDismiss = { showWeekStartDialog = false }
         )
+    }
+
+    if (showAlertSoundDialog) {
+        SelectionDialog(
+            title = "Default Alert Sound",
+            options = listOf("default", "silent", "vibrate"),
+            selectedOption = prefs.defaultAlertSound,
+            onOptionSelected = { viewModel.updateDefaultAlertSound(it); showAlertSoundDialog = false },
+            onDismiss = { showAlertSoundDialog = false }
+        )
+    }
+
+    if (showDefaultTimeDialog) {
+        val cal = Calendar.getInstance().apply {
+            set(Calendar.HOUR_OF_DAY, prefs.defaultReminderHour)
+            set(Calendar.MINUTE, prefs.defaultReminderMinute)
+        }
+        TimePickerDialog(
+            context,
+            { _, hour, minute ->
+                viewModel.updateDefaultReminderTime(hour, minute)
+                showDefaultTimeDialog = false
+            },
+            cal.get(Calendar.HOUR_OF_DAY),
+            cal.get(Calendar.MINUTE),
+            prefs.use24HourFormat
+        ).show()
+        showDefaultTimeDialog = false
     }
 }
 
