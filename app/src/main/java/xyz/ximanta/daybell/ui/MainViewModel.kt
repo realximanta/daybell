@@ -1,5 +1,6 @@
 package xyz.ximanta.daybell.ui
 
+import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.flow.SharingStarted
@@ -12,13 +13,15 @@ import xyz.ximanta.daybell.data.local.CategoryDao
 import xyz.ximanta.daybell.data.local.Task
 import xyz.ximanta.daybell.data.preferences.SettingsDataStore
 import xyz.ximanta.daybell.data.preferences.UserPreferences
+import xyz.ximanta.daybell.data.repository.BackupManager
 import xyz.ximanta.daybell.data.repository.TaskRepository
 import java.util.Calendar
 
 class MainViewModel(
     private val repository: TaskRepository,
     private val settingsDataStore: SettingsDataStore,
-    private val categoryDao: CategoryDao
+    private val categoryDao: CategoryDao,
+    private val backupManager: BackupManager // FIXED: Injected BackupManager
 ) : ViewModel() {
 
     val userPreferences: StateFlow<UserPreferences> = settingsDataStore.userPreferencesFlow
@@ -142,7 +145,6 @@ class MainViewModel(
         }
     }
 
-    // FIXED: Added missing bridge functions for SettingsScreen
     fun updateAutoRolloverOverdue(enabled: Boolean) {
         viewModelScope.launch {
             settingsDataStore.updateAutoRolloverOverdue(enabled)
@@ -171,6 +173,20 @@ class MainViewModel(
     fun deleteCategory(category: Category) {
         viewModelScope.launch {
             categoryDao.deleteCategory(category)
+        }
+    }
+
+    // --- Backup & Restore ---
+    fun exportData(uri: Uri) {
+        viewModelScope.launch {
+            backupManager.exportData(uri)
+        }
+    }
+
+    fun importData(uri: Uri) {
+        viewModelScope.launch {
+            backupManager.importData(uri)
+            // Note: In a future update, we should trigger a reschedule of all alarms here
         }
     }
 }
