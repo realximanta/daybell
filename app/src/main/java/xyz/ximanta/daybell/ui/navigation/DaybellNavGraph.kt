@@ -17,6 +17,7 @@ import xyz.ximanta.daybell.ui.screens.AllTasksScreen
 import xyz.ximanta.daybell.ui.screens.CategoriesScreen
 import xyz.ximanta.daybell.ui.screens.CompletedScreen
 import xyz.ximanta.daybell.ui.screens.DashboardScreen
+import xyz.ximanta.daybell.ui.screens.RecycleBinScreen
 import xyz.ximanta.daybell.ui.screens.SettingsScreen
 import xyz.ximanta.daybell.ui.screens.TaskEditorScreen
 import xyz.ximanta.daybell.ui.screens.TodayScreen
@@ -28,6 +29,7 @@ sealed class Screen(val route: String) {
     object Today : Screen("today")
     object Upcoming : Screen("upcoming")
     object Completed : Screen("completed")
+    object RecycleBin : Screen("recycle_bin") // FIXED: Added Recycle Bin route
     object Categories : Screen("categories")
     object Settings : Screen("settings")
     object About : Screen("about")
@@ -106,6 +108,17 @@ fun DaybellNavGraph(
             )
         }
 
+        // FIXED: Wired up the Recycle Bin Screen
+        composable(Screen.RecycleBin.route) {
+            val deletedTasks by mainViewModel.deletedTasks.collectAsStateWithLifecycle()
+            RecycleBinScreen(
+                deletedTasks = deletedTasks,
+                onNavigateBack = { navController.popBackStack() },
+                onRestoreTask = { task -> mainViewModel.restoreTask(task.id) },
+                onPermanentlyDeleteTask = { task -> mainViewModel.permanentlyDeleteTask(task) }
+            )
+        }
+
         composable(Screen.Categories.route) {
             val categories by mainViewModel.allCategories.collectAsStateWithLifecycle()
             CategoriesScreen(
@@ -136,7 +149,6 @@ fun DaybellNavGraph(
             val taskId = backStackEntry.arguments?.getLong("taskId")
             
             LaunchedEffect(taskId) {
-                // If taskId is 0, it's a new task. Otherwise, load the existing one.
                 taskEditorViewModel.loadTask(if (taskId == 0L) null else taskId)
             }
 
