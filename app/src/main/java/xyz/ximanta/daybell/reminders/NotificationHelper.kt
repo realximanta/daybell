@@ -25,8 +25,13 @@ class NotificationHelper(private val context: Context) {
         title: String,
         description: String?,
         repeatType: String,
-        snoozeDuration: Int
+        snoozeDuration: Int,
+        isAdvanceAlert: Boolean = false // FIXED: Added parameter to handle advance alerts
     ) {
+        // Use a different channel and priority if this is an advance alert
+        val channelId = if (isAdvanceAlert) DaybellApplication.CHANNEL_SILENT else DaybellApplication.CHANNEL_HIGH
+        val priority = if (isAdvanceAlert) NotificationCompat.PRIORITY_LOW else NotificationCompat.PRIORITY_HIGH
+
         // Tap on notification opens the app and deep links to the task
         val openIntent = Intent(context, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
@@ -66,7 +71,7 @@ class NotificationHelper(private val context: Context) {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
-        val builder = NotificationCompat.Builder(context, DaybellApplication.CHANNEL_HIGH)
+        val builder = NotificationCompat.Builder(context, channelId)
             .setSmallIcon(R.drawable.ic_daybell_logo)
             .setContentTitle(title)
             .setContentText(description ?: context.getString(R.string.app_name))
@@ -74,15 +79,17 @@ class NotificationHelper(private val context: Context) {
                 NotificationCompat.BigTextStyle()
                     .bigText(description ?: context.getString(R.string.app_name))
             )
-            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setPriority(priority)
             .setCategory(NotificationCompat.CATEGORY_REMINDER)
             .setAutoCancel(true)
             .setContentIntent(openPendingIntent)
             .addAction(0, context.getString(R.string.action_done), donePendingIntent)
             .addAction(0, context.getString(R.string.action_snooze), snoozePendingIntent)
 
-        // If this is a repeating task, let the user know
-        if (repeatType != "NONE") {
+        // If this is an advance alert, add a subtext so the user knows the actual time is coming up
+        if (isAdvanceAlert) {
+            builder.setSubText("Upcoming")
+        } else if (repeatType != "NONE") {
             builder.setSubText(context.getString(R.string.dashboard_upcoming))
         }
 
@@ -99,5 +106,7 @@ class NotificationHelper(private val context: Context) {
 
     fun cancelNotification(reminderId: Long) {
         notificationManager.cancel(reminderId.toInt())
+        // FIXED: Ensure we also cancel the advance alert notification if it's active
+        notificationManager.cancel(reminderId.toInt() + 100000) 
     }
 }
