@@ -49,10 +49,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.core.app.NotificationManagerCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import xyz.ximanta.daybell.data.preferences.UserPreferences
 import xyz.ximanta.daybell.ui.MainViewModel
 import xyz.ximanta.daybell.ui.theme.NeonTeal
-import xyz.ximanta.daybell.ui.theme.SoftViolet
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -179,7 +177,8 @@ fun SettingsScreen(
                     title = "Auto-Rollover Overdue",
                     subtitle = "Move missed tasks to today",
                     checked = prefs.autoRolloverOverdue,
-                    onCheckedChange = { /* TODO: Update in DataStore */ }
+                    // FIXED: Wired up the callback to actually persist the setting
+                    onCheckedChange = { viewModel.updateAutoRolloverOverdue(it) }
                 )
             }
 
