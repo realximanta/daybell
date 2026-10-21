@@ -15,6 +15,7 @@ import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material3.Button
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.DropdownMenuItem
@@ -62,7 +63,6 @@ fun TaskEditorScreen(
     var showTimePicker by remember { mutableStateOf(false) }
 
     val dateFormat = SimpleDateFormat("MMM d, yyyy", Locale.getDefault())
-    // FIXED: Respect the 24-hour preference from DataStore
     val timeFormat = if (userPreferences.use24HourFormat) {
         SimpleDateFormat("HH:mm", Locale.getDefault())
     } else {
@@ -98,7 +98,6 @@ fun TaskEditorScreen(
                 .verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // Title Input
             OutlinedTextField(
                 value = state.title,
                 onValueChange = viewModel::updateTitle,
@@ -107,7 +106,6 @@ fun TaskEditorScreen(
                 singleLine = true
             )
 
-            // Description Input
             OutlinedTextField(
                 value = state.description,
                 onValueChange = viewModel::updateDescription,
@@ -116,12 +114,10 @@ fun TaskEditorScreen(
                 minLines = 3
             )
 
-            // Date & Time Row
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                // Date Picker Button
                 OutlinedTextField(
                     value = dateFormat.format(Date(state.dateTime)),
                     onValueChange = {},
@@ -135,7 +131,6 @@ fun TaskEditorScreen(
                     modifier = Modifier.weight(1f)
                 )
 
-                // Time Picker Button
                 OutlinedTextField(
                     value = timeFormat.format(Date(state.dateTime)),
                     onValueChange = {},
@@ -148,6 +143,39 @@ fun TaskEditorScreen(
                     },
                     modifier = Modifier.weight(1f)
                 )
+            }
+
+            // Priority Dropdown (FIXED: Audit noted this was missing)
+            var expandedPriority by remember { mutableStateOf(false) }
+            val priorityOptions = listOf(1 to "Low", 2 to "Medium", 3 to "High")
+            ExposedDropdownMenuBox(
+                expanded = expandedPriority,
+                onExpandedChange = { expandedPriority = !expandedPriority }
+            ) {
+                OutlinedTextField(
+                    value = priorityOptions.find { it.first == state.priority }?.second ?: "Medium",
+                    onValueChange = {},
+                    readOnly = true,
+                    label = { Text("Priority") },
+                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expandedPriority) },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .menuAnchor()
+                )
+                ExposedDropdownMenu(
+                    expanded = expandedPriority,
+                    onDismissRequest = { expandedPriority = false }
+                ) {
+                    priorityOptions.forEach { (value, label) ->
+                        DropdownMenuItem(
+                            text = { Text(label) },
+                            onClick = {
+                                viewModel.updatePriority(value)
+                                expandedPriority = false
+                            }
+                        )
+                    }
+                }
             }
 
             // Category Dropdown
@@ -184,7 +212,7 @@ fun TaskEditorScreen(
 
             // Repeat Type Dropdown
             var expandedRepeat by remember { mutableStateOf(false) }
-            val repeatOptions = listOf("NONE", "DAILY", "WEEKLY", "MONTHLY")
+            val repeatOptions = listOf("NONE", "DAILY", "WEEKLY", "MONTHLY", "CUSTOM")
             ExposedDropdownMenuBox(
                 expanded = expandedRepeat,
                 onExpandedChange = { expandedRepeat = !expandedRepeat }
@@ -219,9 +247,71 @@ fun TaskEditorScreen(
                 }
             }
 
+            // Custom Repeat Days Checkboxes (FIXED: Audit noted this was missing)
+            if (state.repeatType == "CUSTOM") {
+                Text("Select Days", style = MaterialTheme.typography.labelLarge)
+                val days = listOf("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
+                val selectedDays = state.repeatDays.split(",").filter { it.isNotBlank() }
+                
+                Column {
+                    days.chunked(4).forEach { rowDays ->
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            rowDays.forEach { day ->
+                                Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                                    Checkbox(
+                                        checked = selectedDays.contains(day),
+                                        onCheckedChange = { isChecked ->
+                                            val newDays = if (isChecked) {
+                                                selectedDays + day
+                                            } else {
+                                                selectedDays - day
+                                            }
+                                            viewModel.updateRepeatDays(newDays.joinToString(","))
+                                        }
+                                    )
+                                    Text(day)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Advance Alert Dropdown (FIXED: Audit noted this was missing)
+            var expandedAdvance by remember { mutableStateOf(false) }
+            val advanceOptions = listOf(0 to "At time of event", 5 to "5 min before", 10 to "10 min before", 15 to "15 min before", 30 to "30 min before")
+            ExposedDropdownMenuBox(
+                expanded = expandedAdvance,
+                onExpandedChange = { expandedAdvance = !expandedAdvance }
+            ) {
+                OutlinedTextField(
+                    value = advanceOptions.find { it.first == state.advanceAlertMinutes }?.second ?: "At time of event",
+                    onValueChange = {},
+                    readOnly = true,
+                    label = { Text("Advance Alert") },
+                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expandedAdvance) },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .menuAnchor()
+                )
+                ExposedDropdownMenu(
+                    expanded = expandedAdvance,
+                    onDismissRequest = { expandedAdvance = false }
+                ) {
+                    advanceOptions.forEach { (value, label) ->
+                        DropdownMenuItem(
+                            text = { Text(label) },
+                            onClick = {
+                                viewModel.updateAdvanceAlert(value)
+                                expandedAdvance = false
+                            }
+                        )
+                    }
+                }
+            }
+
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Save Button
             Button(
                 onClick = { viewModel.saveTask(onSuccess = onNavigateBack) },
                 modifier = Modifier
@@ -247,7 +337,6 @@ fun TaskEditorScreen(
                     datePickerState.selectedDateMillis?.let { selectedDate ->
                         val cal = Calendar.getInstance().apply {
                             timeInMillis = selectedDate
-                            // Keep the existing time
                             val existingTime = Calendar.getInstance().apply { timeInMillis = state.dateTime }
                             set(Calendar.HOUR_OF_DAY, existingTime.get(Calendar.HOUR_OF_DAY))
                             set(Calendar.MINUTE, existingTime.get(Calendar.MINUTE))
@@ -255,18 +344,12 @@ fun TaskEditorScreen(
                         viewModel.updateDateTime(cal.timeInMillis)
                     }
                     showDatePicker = false
-                }) {
-                    Text("OK")
-                }
+                }) { Text("OK") }
             },
             dismissButton = {
-                TextButton(onClick = { showDatePicker = false }) {
-                    Text("Cancel")
-                }
+                TextButton(onClick = { showDatePicker = false }) { Text("Cancel") }
             }
-        ) {
-            DatePicker(state = datePickerState)
-        }
+        ) { DatePicker(state = datePickerState) }
     }
 
     // Time Picker Dialog
@@ -275,17 +358,13 @@ fun TaskEditorScreen(
         val timePickerState = rememberTimePickerState(
             initialHour = cal.get(Calendar.HOUR_OF_DAY),
             initialMinute = cal.get(Calendar.MINUTE),
-            is24Hour = userPreferences.use24HourFormat // FIXED: Respect 24-hour format
+            is24Hour = userPreferences.use24HourFormat
         )
 
         androidx.compose.material3.AlertDialog(
             onDismissRequest = { showTimePicker = false },
             title = { Text("Select Time") },
-            text = {
-                Column(modifier = Modifier.fillMaxWidth()) {
-                    TimePicker(state = timePickerState)
-                }
-            },
+            text = { Column(modifier = Modifier.fillMaxWidth()) { TimePicker(state = timePickerState) } },
             confirmButton = {
                 TextButton(onClick = {
                     val newCal = Calendar.getInstance().apply {
@@ -295,14 +374,10 @@ fun TaskEditorScreen(
                     }
                     viewModel.updateDateTime(newCal.timeInMillis)
                     showTimePicker = false
-                }) {
-                    Text("OK")
-                }
+                }) { Text("OK") }
             },
             dismissButton = {
-                TextButton(onClick = { showTimePicker = false }) {
-                    Text("Cancel")
-                }
+                TextButton(onClick = { showTimePicker = false }) { Text("Cancel") }
             }
         )
     }
