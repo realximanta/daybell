@@ -11,7 +11,8 @@ import kotlinx.coroutines.flow.Flow
 @Dao
 interface TaskDao {
 
-    @Query("SELECT * FROM tasks WHERE isDeleted = 0 ORDER BY dateTime ASC")
+    // FIXED: Now strictly filters out completed tasks so they don't appear in the active dashboard
+    @Query("SELECT * FROM tasks WHERE isDeleted = 0 AND isCompleted = 0 ORDER BY dateTime ASC")
     fun getAllActiveTasks(): Flow<List<Task>>
 
     @Query("SELECT * FROM tasks WHERE isDeleted = 1 ORDER BY dateTime DESC")
@@ -26,7 +27,7 @@ interface TaskDao {
     @Query("SELECT * FROM tasks WHERE id = :taskId")
     suspend fun getTaskByIdSync(taskId: Long): Task?
 
-    @Query("SELECT * FROM tasks WHERE dateTime >= :startOfDay AND dateTime <= :endOfDay AND isDeleted = 0 ORDER BY dateTime ASC")
+    @Query("SELECT * FROM tasks WHERE dateTime >= :startOfDay AND dateTime <= :endOfDay AND isDeleted = 0 AND isCompleted = 0 ORDER BY dateTime ASC")
     fun getTasksForDay(startOfDay: Long, endOfDay: Long): Flow<List<Task>>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
