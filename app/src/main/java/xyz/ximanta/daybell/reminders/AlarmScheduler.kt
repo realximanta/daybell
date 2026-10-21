@@ -16,8 +16,7 @@ class AlarmScheduler(private val context: Context) {
 
     /**
      * Schedules an exact alarm for the given task and reminder.
-     * Uses setExactAndAllowWhileIdle for precise delivery without acting like a system alarm clock.
-     * Falls back to inexact alarms if the user has denied SCHEDULE_EXACT_ALARM on Android 12+.
+     * Also schedules an advance alert if specified in the reminder.
      */
     fun schedule(task: Task, reminder: Reminder) {
         val triggerTime = reminder.triggerTime
@@ -27,29 +26,55 @@ class AlarmScheduler(private val context: Context) {
             return
         }
 
-        // PendingIntent for the BroadcastReceiver that will show the notification
-        val intent = Intent(context, AlarmReceiver::class.java).apply {
+        // 1. Schedule the Main Alarm
+        val mainIntent = Intent(context, AlarmReceiver::class.java).apply {
             putExtra("EXTRA_TASK_ID", task.id)
             putExtra("EXTRA_TASK_TITLE", task.title)
             putExtra("EXTRA_TASK_DESC", task.description)
             putExtra("EXTRA_REMINDER_ID", reminder.id)
             putExtra("EXTRA_REPEAT_TYPE", reminder.repeatType)
             putExtra("EXTRA_SNOOZE_DURATION", reminder.snoozeDurationMinutes)
+            putExtra("EXTRA_IS_ADVANCE_ALERT", false)
         }
-
-        // Unique request code based on reminder ID
-        val requestCode = reminder.id.toInt()
-
-        val operation = PendingIntent.getBroadcast(
+        val mainOperation = PendingIntent.getBroadcast(
             context,
-            requestCode,
-            intent,
+            reminder.id.toInt(),
+            mainIntent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
+        scheduleExact(triggerTime, mainOperation)
 
+        // 2. Schedule the Advance Alert (if configured)
+        if (reminder.advanceAlertMinutes > 0) {
+            val advanceTriggerTime = triggerTime - (reminder.advanceAlertMinutes * 60 * 1000L)
+            
+            // Only schedule if it's in the future
+            if (advanceTriggerTime > System.currentTimeMillis()) {
+                val advanceIntent = Intent(context, AlarmReceiver::class.java).apply {
+                    putExtra("EXTRA_TASK_ID", task.id)
+                    putExtra("EXTRA_TASK_TITLE", task.title)
+                    putExtra("EXTRA_TASK_DESC", task.description)
+                    putExtra("EXTRA_REMINDER_ID", reminder.id)
+                    putExtra("EXTRA_REPEAT_TYPE", reminder.repeatType)
+                    putExtra("EXTRA_SNOOZE_DURATION", reminder.snoozeDurationMinutes)
+                    putExtra("EXTRA_IS_ADVANCE_ALERT", true)
+                }
+                // Unique request code for advance alert
+                val advanceOperation = PendingIntent.getBroadcast(
+                    context,
+                    reminder.id.toInt() + 100000,
+                    advanceIntent,
+                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+                )
+                scheduleExact(advanceTriggerTime, advanceOperation)
+            }
+        }
+    }
+
+    private fun scheduleExact(triggerTime: Long, operation: PendingIntent) {
         try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && !alarmManager.canScheduleExactAlarms()) {
-                // Permission denied: Fallback to inexact alarm (may be delayed by Doze mode)
+                // Permission denied: Fallback to inexact alarm
                 Log.w("AlarmScheduler", "Exact alarm permission denied. Falling back to inexact.")
                 alarmManager.setAndAllowWhileIdle(
                     AlarmManager.RTC_WAKEUP,
@@ -58,7 +83,6 @@ class AlarmScheduler(private val context: Context) {
                 )
             } else {
                 // Permission granted: Use setExactAndAllowWhileIdle for precise delivery
-                // FIXED: Replaced setAlarmClock to avoid hijacking the system's alarm UI
                 alarmManager.setExactAndAllowWhileIdle(
                     AlarmManager.RTC_WAKEUP,
                     triggerTime,
@@ -66,7 +90,6 @@ class AlarmScheduler(private val context: Context) {
                 )
             }
         } catch (e: SecurityException) {
-            // Catch edge case where permission is revoked mid-flight
             Log.e("AlarmScheduler", "SecurityException scheduling alarm, using fallback", e)
             alarmManager.setAndAllowWhileIdle(
                 AlarmManager.RTC_WAKEUP,
@@ -77,16 +100,35 @@ class AlarmScheduler(private val context: Context) {
     }
 
     /**
-     * Cancels an existing alarm using the reminder's unique ID.
+     * Cancels all existing alarms (main, advance, and snooze) for the given reminder.
      */
     fun cancel(reminderId: Long) {
-        val intent = Intent(context, AlarmReceiver::class.java)
-        val pendingIntent = PendingIntent.getBroadcast(
+        // Cancel Main Alarm
+        val mainIntent = Intent(context, AlarmReceiver::class.java)
+        val mainPendingIntent = PendingIntent.getBroadcast(
             context,
             reminderId.toInt(),
-            intent,
+            mainIntent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
-        alarmManager.cancel(pendingIntent)
+        alarmManager.cancel(mainPendingIntent)
+
+        // Cancel Advance Alert
+        val advancePendingIntent = PendingIntent.getBroadcast(
+            context,
+            reminderId.toInt() + 100000,
+            mainIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+        alarmManager.cancel(advancePendingIntent)
+
+        // Cancel Snoozed Alarm (if any)
+        val snoozePendingIntent = PendingIntent.getBroadcast(
+            context,
+            reminderId.toInt() + 500000,
+            mainIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+        alarmManager.cancel(snoozePendingIntent)
     }
 }
