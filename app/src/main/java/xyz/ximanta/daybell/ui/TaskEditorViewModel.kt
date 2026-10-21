@@ -48,7 +48,6 @@ class TaskEditorViewModel(
             initialValue = emptyList()
         )
 
-    // FIXED: Exposed userPreferences so the UI can respect 24-hour format and default snooze
     val userPreferences: StateFlow<UserPreferences> = settingsDataStore.userPreferencesFlow
         .stateIn(
             scope = viewModelScope,
@@ -58,9 +57,6 @@ class TaskEditorViewModel(
 
     private var existingReminders: List<Reminder> = emptyList()
 
-    /**
-     * Load an existing task for editing, or apply defaults for a new task.
-     */
     fun loadTask(taskId: Long?) {
         viewModelScope.launch {
             _state.value = _state.value.copy(isLoading = true)
@@ -92,7 +88,6 @@ class TaskEditorViewModel(
                 }
             } else {
                 // New task mode
-                // Clear existing reminders to prevent ID reuse from the previously edited task
                 existingReminders = emptyList()
                 
                 val prefs = settingsDataStore.userPreferencesFlow.first()
@@ -113,7 +108,6 @@ class TaskEditorViewModel(
         cal.set(java.util.Calendar.MINUTE, minute)
         cal.set(java.util.Calendar.SECOND, 0)
         cal.set(java.util.Calendar.MILLISECOND, 0)
-        // If the time has already passed today, default to tomorrow
         if (cal.timeInMillis <= System.currentTimeMillis()) {
             cal.add(java.util.Calendar.DAY_OF_YEAR, 1)
         }
@@ -156,15 +150,15 @@ class TaskEditorViewModel(
         _state.value = _state.value.copy(snoozeDurationMinutes = minutes)
     }
 
-    /**
-     * Saves the task. Inserts new or updates existing with reminders.
-     */
     fun saveTask(onSuccess: () -> Unit) {
         val currentState = _state.value
         if (currentState.title.isBlank()) return
 
         viewModelScope.launch {
             _state.value = currentState.copy(isSaving = true)
+
+            // FIXED: Fetch existing task to preserve its completion state and creation date
+            val existingTask = if (currentState.taskId > 0) repository.getTaskByIdSync(currentState.taskId) else null
 
             val task = Task(
                 id = currentState.taskId,
@@ -173,10 +167,10 @@ class TaskEditorViewModel(
                 dateTime = currentState.dateTime,
                 category = currentState.category,
                 priority = currentState.priority,
-                isCompleted = false
+                isCompleted = existingTask?.isCompleted ?: false,
+                createdAt = existingTask?.createdAt ?: System.currentTimeMillis()
             )
 
-            // Always pass id = 0 to ensure the repository generates a fresh reminder ID
             val reminder = Reminder(
                 id = 0,
                 taskId = task.id,
