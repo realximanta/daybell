@@ -39,7 +39,10 @@ class AlarmReceiver : BroadcastReceiver() {
                         // 2. Cancel the current notification
                         notificationHelper.cancelNotification(reminderId)
                         
-                        // 3. Cancel ALL future alarms for this task (Fixes P1 bug)
+                        // 3. Cancel the currently firing alarm (crucial if it was a snoozed alarm)
+                        alarmScheduler.cancel(reminderId)
+                        
+                        // 4. Cancel ALL future alarms for this task
                         val allReminders = db.reminderDao().getRemindersForTaskSync(taskId)
                         for (r in allReminders) {
                             alarmScheduler.cancel(r.id)
@@ -50,20 +53,20 @@ class AlarmReceiver : BroadcastReceiver() {
                         val snoozeDuration = intent.getIntExtra("EXTRA_SNOOZE_DURATION", 10)
                         notificationHelper.cancelNotification(reminderId)
                         
-                        // Fetch the latest reminder to reschedule it
                         val reminders = db.reminderDao().getRemindersForTaskSync(taskId)
                         val reminder = reminders.find { it.id == reminderId }
                         val task = db.taskDao().getTaskByIdSync(taskId)
 
                         if (reminder != null && task != null) {
-                            // Calculate new trigger time
                             val newTriggerTime = System.currentTimeMillis() + (snoozeDuration * 60 * 1000L)
+                            
+                            // FIXED: Do not update the DB reminder's triggerTime to prevent schedule drift.
+                            // Instead, schedule a temporary one-off alarm with a unique ID.
+                            // We add 500000 to avoid colliding with the original reminder ID.
                             val snoozedReminder = reminder.copy(
-                                id = reminder.id, // Keep same ID to override/cancel previous
+                                id = reminder.id + 500000,
                                 triggerTime = newTriggerTime
                             )
-                            // Update DB and schedule
-                            db.reminderDao().updateReminder(snoozedReminder)
                             alarmScheduler.schedule(task, snoozedReminder)
                         }
                     }
@@ -86,6 +89,8 @@ class AlarmReceiver : BroadcastReceiver() {
                         )
 
                         // 2. Handle Repeating Tasks (Chain method)
+                        // Note: If this was a snoozed alarm, reminderId is > 500000, 
+                        // so reminder will be null and it won't schedule a duplicate next occurrence.
                         if (repeatType != "NONE") {
                             val reminders = db.reminderDao().getRemindersForTaskSync(taskId)
                             val reminder = reminders.find { it.id == reminderId }
