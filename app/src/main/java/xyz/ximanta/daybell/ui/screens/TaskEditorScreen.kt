@@ -56,12 +56,18 @@ fun TaskEditorScreen(
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val categories by viewModel.categories.collectAsStateWithLifecycle()
+    val userPreferences by viewModel.userPreferences.collectAsStateWithLifecycle()
 
     var showDatePicker by remember { mutableStateOf(false) }
     var showTimePicker by remember { mutableStateOf(false) }
 
     val dateFormat = SimpleDateFormat("MMM d, yyyy", Locale.getDefault())
-    val timeFormat = SimpleDateFormat("h:mm a", Locale.getDefault())
+    // FIXED: Respect the 24-hour preference from DataStore
+    val timeFormat = if (userPreferences.use24HourFormat) {
+        SimpleDateFormat("HH:mm", Locale.getDefault())
+    } else {
+        SimpleDateFormat("h:mm a", Locale.getDefault())
+    }
 
     Scaffold(
         topBar = {
@@ -269,7 +275,7 @@ fun TaskEditorScreen(
         val timePickerState = rememberTimePickerState(
             initialHour = cal.get(Calendar.HOUR_OF_DAY),
             initialMinute = cal.get(Calendar.MINUTE),
-            is24Hour = false
+            is24Hour = userPreferences.use24HourFormat // FIXED: Respect 24-hour format
         )
 
         androidx.compose.material3.AlertDialog(
