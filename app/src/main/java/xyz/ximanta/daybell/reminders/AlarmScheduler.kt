@@ -6,7 +6,6 @@ import android.content.Context
 import android.content.Intent
 import android.os.Build
 import android.util.Log
-import xyz.ximanta.daybell.MainActivity
 import xyz.ximanta.daybell.data.local.Reminder
 import xyz.ximanta.daybell.data.local.Task
 import xyz.ximanta.daybell.receivers.AlarmReceiver
@@ -17,7 +16,7 @@ class AlarmScheduler(private val context: Context) {
 
     /**
      * Schedules an exact alarm for the given task and reminder.
-     * Uses setAlarmClock for maximum reliability (bypasses Doze mode).
+     * Uses setExactAndAllowWhileIdle for precise delivery without acting like a system alarm clock.
      * Falls back to inexact alarms if the user has denied SCHEDULE_EXACT_ALARM on Android 12+.
      */
     fun schedule(task: Task, reminder: Reminder) {
@@ -28,7 +27,7 @@ class AlarmScheduler(private val context: Context) {
             return
         }
 
-        // 1. PendingIntent for the BroadcastReceiver that will show the notification
+        // PendingIntent for the BroadcastReceiver that will show the notification
         val intent = Intent(context, AlarmReceiver::class.java).apply {
             putExtra("EXTRA_TASK_ID", task.id)
             putExtra("EXTRA_TASK_TITLE", task.title)
@@ -48,18 +47,6 @@ class AlarmScheduler(private val context: Context) {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
-        // 2. PendingIntent for when the user taps the alarm icon in the status bar
-        val showIntent = Intent(context, MainActivity::class.java).apply {
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
-            putExtra("EXTRA_TASK_ID", task.id)
-        }
-        val showPendingIntent = PendingIntent.getActivity(
-            context,
-            requestCode,
-            showIntent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
-
         try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && !alarmManager.canScheduleExactAlarms()) {
                 // Permission denied: Fallback to inexact alarm (may be delayed by Doze mode)
@@ -70,9 +57,13 @@ class AlarmScheduler(private val context: Context) {
                     operation
                 )
             } else {
-                // Permission granted: Use AlarmClock for highest priority delivery
-                val alarmClockInfo = AlarmManager.AlarmClockInfo(triggerTime, showPendingIntent)
-                alarmManager.setAlarmClock(alarmClockInfo, operation)
+                // Permission granted: Use setExactAndAllowWhileIdle for precise delivery
+                // FIXED: Replaced setAlarmClock to avoid hijacking the system's alarm UI
+                alarmManager.setExactAndAllowWhileIdle(
+                    AlarmManager.RTC_WAKEUP,
+                    triggerTime,
+                    operation
+                )
             }
         } catch (e: SecurityException) {
             // Catch edge case where permission is revoked mid-flight
