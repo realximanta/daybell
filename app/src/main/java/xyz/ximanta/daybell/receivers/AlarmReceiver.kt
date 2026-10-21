@@ -60,8 +60,7 @@ class AlarmReceiver : BroadcastReceiver() {
                         if (reminder != null && task != null) {
                             val newTriggerTime = System.currentTimeMillis() + (snoozeDuration * 60 * 1000L)
                             
-                            // FIXED: Do not update the DB reminder's triggerTime to prevent schedule drift.
-                            // Instead, schedule a temporary one-off alarm with a unique ID.
+                            // Schedule a temporary one-off alarm with a unique ID.
                             // We add 500000 to avoid colliding with the original reminder ID.
                             val snoozedReminder = reminder.copy(
                                 id = reminder.id + 500000,
@@ -89,8 +88,6 @@ class AlarmReceiver : BroadcastReceiver() {
                         )
 
                         // 2. Handle Repeating Tasks (Chain method)
-                        // Note: If this was a snoozed alarm, reminderId is > 500000, 
-                        // so reminder will be null and it won't schedule a duplicate next occurrence.
                         if (repeatType != "NONE") {
                             val reminders = db.reminderDao().getRemindersForTaskSync(taskId)
                             val reminder = reminders.find { it.id == reminderId }
@@ -99,9 +96,15 @@ class AlarmReceiver : BroadcastReceiver() {
                             if (reminder != null && task != null) {
                                 val nextTriggerTime = calculateNextOccurrence(reminder.triggerTime, repeatType)
                                 if (nextTriggerTime > 0) {
+                                    // FIXED: Update the task's dateTime to match the next occurrence
+                                    // so it doesn't permanently show as "Overdue" on the dashboard.
+                                    val updatedTask = task.copy(dateTime = nextTriggerTime)
+                                    db.taskDao().updateTask(updatedTask)
+                                    
                                     val nextReminder = reminder.copy(triggerTime = nextTriggerTime)
                                     db.reminderDao().updateReminder(nextReminder)
-                                    alarmScheduler.schedule(task, nextReminder)
+                                    
+                                    alarmScheduler.schedule(updatedTask, nextReminder)
                                 }
                             }
                         }
