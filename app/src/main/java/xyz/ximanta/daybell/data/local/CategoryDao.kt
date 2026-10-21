@@ -14,6 +14,10 @@ interface CategoryDao {
     @Query("SELECT * FROM categories ORDER BY name ASC")
     fun getAllCategories(): Flow<List<Category>>
 
+    // FIXED: Added synchronous list query required by BackupManager
+    @Query("SELECT * FROM categories")
+    suspend fun getAllCategoriesListSync(): List<Category>
+
     @Query("SELECT * FROM categories WHERE id = :categoryId")
     suspend fun getCategoryById(categoryId: Long): Category?
 
