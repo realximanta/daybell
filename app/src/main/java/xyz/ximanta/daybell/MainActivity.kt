@@ -48,7 +48,8 @@ class MainActivity : ComponentActivity() {
         object : ViewModelProvider.Factory {
             @Suppress("UNCHECKED_CAST")
             override fun <T : ViewModel> create(modelClass: Class<T>): T {
-                return MainViewModel(repository, settingsDataStore) as T
+                // FIXED: Added database.categoryDao() to satisfy the updated MainViewModel constructor
+                return MainViewModel(repository, settingsDataStore, database.categoryDao()) as T
             }
         }
     }
@@ -95,13 +96,13 @@ class MainActivity : ComponentActivity() {
                             // Drawer Menu Items
                             val navItems = listOf(
                                 "Home" to Screen.Dashboard.route,
-                                "All Tasks" to "all_tasks",
-                                "Today" to "today",
-                                "Upcoming" to "upcoming",
-                                "Completed" to "completed",
-                                "Categories" to "categories",
+                                "All Tasks" to Screen.AllTasks.route,
+                                "Today" to Screen.Today.route,
+                                "Upcoming" to Screen.Upcoming.route,
+                                "Completed" to Screen.Completed.route,
+                                "Categories" to Screen.Categories.route,
                                 "Settings" to Screen.Settings.route,
-                                "About" to "about"
+                                "About" to Screen.About.route
                             )
                             
                             navItems.forEach { (label, route) ->
