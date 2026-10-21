@@ -83,6 +83,9 @@ class TaskEditorViewModel(
                 }
             } else {
                 // New task mode
+                // FIXED: Clear existing reminders to prevent ID reuse from the previously edited task
+                existingReminders = emptyList()
+                
                 val prefs = settingsDataStore.userPreferencesFlow.first()
                 val defaultDateTime = getDefaultReminderDateTime(prefs.defaultReminderHour, prefs.defaultReminderMinute)
 
@@ -164,8 +167,9 @@ class TaskEditorViewModel(
                 isCompleted = false
             )
 
+            // FIXED: Always pass id = 0 to ensure the repository generates a fresh reminder ID
             val reminder = Reminder(
-                id = existingReminders.firstOrNull()?.id ?: 0,
+                id = 0,
                 taskId = task.id,
                 triggerTime = currentState.dateTime,
                 repeatType = currentState.repeatType,
