@@ -26,23 +26,16 @@ class AlarmReceiver : BroadcastReceiver() {
         val notificationHelper = NotificationHelper(appContext)
         val alarmScheduler = AlarmScheduler(appContext)
 
-        // Use goAsync() because we are doing database operations in a background coroutine
         val pendingResult = goAsync()
 
         CoroutineScope(Dispatchers.IO).launch {
             try {
                 when (action) {
                     ACTION_DONE -> {
-                        // 1. Mark task complete in DB
                         db.taskDao().setTaskCompletion(taskId, true)
-                        
-                        // 2. Cancel the current notification
                         notificationHelper.cancelNotification(reminderId)
-                        
-                        // 3. Cancel the currently firing alarm (crucial if it was a snoozed alarm)
                         alarmScheduler.cancel(reminderId)
                         
-                        // 4. Cancel ALL future alarms for this task
                         val allReminders = db.reminderDao().getRemindersForTaskSync(taskId)
                         for (r in allReminders) {
                             alarmScheduler.cancel(r.id)
@@ -59,9 +52,6 @@ class AlarmReceiver : BroadcastReceiver() {
 
                         if (reminder != null && task != null) {
                             val newTriggerTime = System.currentTimeMillis() + (snoozeDuration * 60 * 1000L)
-                            
-                            // Schedule a temporary one-off alarm with a unique ID.
-                            // We add 500000 to avoid colliding with the original reminder ID.
                             val snoozedReminder = reminder.copy(
                                 id = reminder.id + 500000,
                                 triggerTime = newTriggerTime
@@ -71,33 +61,32 @@ class AlarmReceiver : BroadcastReceiver() {
                     }
 
                     else -> {
-                        // Default Action: Alarm Fired!
                         val title = intent.getStringExtra("EXTRA_TASK_TITLE") ?: "Task Reminder"
                         val description = intent.getStringExtra("EXTRA_TASK_DESC")
                         val repeatType = intent.getStringExtra("EXTRA_REPEAT_TYPE") ?: "NONE"
                         val snoozeDuration = intent.getIntExtra("EXTRA_SNOOZE_DURATION", 10)
+                        val isAdvanceAlert = intent.getBooleanExtra("EXTRA_IS_ADVANCE_ALERT", false)
 
-                        // 1. Show the notification
                         notificationHelper.showNotification(
                             taskId = taskId,
                             reminderId = reminderId,
                             title = title,
                             description = description,
                             repeatType = repeatType,
-                            snoozeDuration = snoozeDuration
+                            snoozeDuration = snoozeDuration,
+                            isAdvanceAlert = isAdvanceAlert
                         )
 
-                        // 2. Handle Repeating Tasks (Chain method)
-                        if (repeatType != "NONE") {
+                        if (repeatType != "NONE" && !isAdvanceAlert) {
                             val reminders = db.reminderDao().getRemindersForTaskSync(taskId)
                             val reminder = reminders.find { it.id == reminderId }
                             val task = db.taskDao().getTaskByIdSync(taskId)
 
                             if (reminder != null && task != null) {
-                                val nextTriggerTime = calculateNextOccurrence(reminder.triggerTime, repeatType)
+                                // FIXED: Passed repeatDays to the calculator for CUSTOM support
+                                val nextTriggerTime = calculateNextOccurrence(reminder.triggerTime, repeatType, reminder.repeatDays)
+                                
                                 if (nextTriggerTime > 0) {
-                                    // FIXED: Update the task's dateTime to match the next occurrence
-                                    // so it doesn't permanently show as "Overdue" on the dashboard.
                                     val updatedTask = task.copy(dateTime = nextTriggerTime)
                                     db.taskDao().updateTask(updatedTask)
                                     
@@ -113,7 +102,6 @@ class AlarmReceiver : BroadcastReceiver() {
             } catch (e: Exception) {
                 Log.e("AlarmReceiver", "Error processing alarm action", e)
             } finally {
-                // Must call finish() to let the system know we are done
                 pendingResult.finish()
             }
         }
@@ -122,11 +110,42 @@ class AlarmReceiver : BroadcastReceiver() {
     /**
      * Calculates the next trigger time based on the repeat type.
      */
-    private fun calculateNextOccurrence(currentTriggerTime: Long, repeatType: String): Long {
+    private fun calculateNextOccurrence(currentTriggerTime: Long, repeatType: String, repeatDays: String?): Long {
         val calendar = Calendar.getInstance().apply {
             timeInMillis = currentTriggerTime
         }
+        val now = System.currentTimeMillis()
 
+        // FIXED: Added logic for Custom Repeat Days
+        if (repeatType == "CUSTOM") {
+            val daysList = repeatDays?.split(",")?.map { it.trim() } ?: emptyList()
+            if (daysList.isEmpty()) return -1L
+
+            var iterations = 0
+            // Max 7 days to loop through, +1 for safety
+            while (iterations < 8) {
+                calendar.add(Calendar.DAY_OF_YEAR, 1)
+                val dayOfWeek = calendar.get(Calendar.DAY_OF_WEEK)
+                val dayName = when (dayOfWeek) {
+                    Calendar.MONDAY -> "Mon"
+                    Calendar.TUESDAY -> "Tue"
+                    Calendar.WEDNESDAY -> "Wed"
+                    Calendar.THURSDAY -> "Thu"
+                    Calendar.FRIDAY -> "Fri"
+                    Calendar.SATURDAY -> "Sat"
+                    Calendar.SUNDAY -> "Sun"
+                    else -> ""
+                }
+                
+                if (daysList.contains(dayName) && calendar.timeInMillis > now) {
+                    return calendar.timeInMillis
+                }
+                iterations++
+            }
+            return -1L
+        }
+
+        // Standard repeat types
         when (repeatType) {
             "DAILY" -> calendar.add(Calendar.DAY_OF_YEAR, 1)
             "WEEKLY" -> calendar.add(Calendar.WEEK_OF_YEAR, 1)
@@ -135,10 +154,7 @@ class AlarmReceiver : BroadcastReceiver() {
             else -> return -1L
         }
         
-        // If the next occurrence is somehow in the past (e.g. device was off for days), 
-        // keep adding intervals until it's in the future.
         var nextTime = calendar.timeInMillis
-        val now = System.currentTimeMillis()
         while (nextTime <= now) {
              when (repeatType) {
                 "DAILY" -> calendar.add(Calendar.DAY_OF_YEAR, 1)
