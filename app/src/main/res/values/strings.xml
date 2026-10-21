@@ -1,0 +1,41 @@
+<resources>
+    <string name="app_name">Daybell</string>
+    <string name="app_tagline">Your day. On time. Offline.</string>
+    <string name="app_description">A calm, private and dependable task reminder.</string>
+
+    <!-- Navigation Drawer -->
+    <string name="nav_home">Home</string>
+    <string name="nav_all_tasks">All Tasks</string>
+    <string name="nav_today">Today</string>
+    <string name="nav_upcoming">Upcoming</string>
+    <string name="nav_completed">Completed</string>
+    <string name="nav_categories">Categories</string>
+    <string name="nav_settings">Settings</string>
+    <string name="nav_about">About</string>
+
+    <!-- Dashboard -->
+    <string name="dashboard_greeting">Your day, organized.</string>
+    <string name="dashboard_subtitle">You decide what matters next.</string>
+    <string name="dashboard_upcoming">Upcoming</string>
+    <string name="dashboard_completed">Completed</string>
+    <string name="dashboard_overdue">Overdue</string>
+    <string name="dashboard_view_all">View all</string>
+    <string name="dashboard_add_task">Add a task</string>
+
+    <!-- Notifications -->
+    <string name="channel_high_name">High Priority Reminders</string>
+    <string name="channel_high_desc">Urgent tasks and alarms</string>
+    <string name="channel_default_name">Standard Reminders</string>
+    <string name="channel_default_desc">Normal task notifications</string>
+    <string name="channel_silent_name">Advance Alerts</string>
+    <string name="channel_silent_desc">Silent pre-notifications for upcoming tasks</string>
+
+    <string name="action_done">Done</string>
+    <string name="action_snooze">Snooze</string>
+    <string name="action_open">Open</string>
+
+    <!-- Permissions & Health -->
+    <string name="permission_notifications_needed">Notifications are disabled. Reminders cannot be delivered.</string>
+    <string name="permission_exact_alarm_needed">Exact alarms are disabled. Reminders may be delayed.</string>
+    <string name="permission_battery_optimization_needed">Battery optimization is ON. Reminders may be delayed by the system.</string>
+</resources>
