@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Base application theme. -->
+    <style name="Theme.Daybell" parent="android:Theme.Material.NoActionBar">
+        <!-- Prevents a white flash while Compose loads -->
+        <item name="android:windowBackground">@color/graphite</item>
+        
+        <!-- System Bar colors to match the Graphite canvas -->
+        <item name="android:statusBarColor">@color/graphite</item>
+        <item name="android:navigationBarColor">@color/graphite</item>
+        
+        <!-- Ensures status bar icons are white -->
+        <item name="android:windowLightStatusBar">false</item>
+    </style>
+</resources>
