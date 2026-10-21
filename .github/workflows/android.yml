@@ -1,9 +1,12 @@
-name: Release Build
+name: Android CI/CD
 
 on:
   push:
+    branches: [ "main" ]
     tags:
       - 'v*'
+  pull_request:
+    branches: [ "main" ]
 
 permissions:
   contents: write
@@ -26,16 +29,27 @@ jobs:
       - name: Grant Execute Permission for Gradlew
         run: chmod +x gradlew
 
+      # FIXED: Audit required unit tests before distribution
+      - name: Run Unit Tests
+        run: ./gradlew test
+
+      # FIXED: Audit required lint checks
+      - name: Run Lint
+        run: ./gradlew lint
+
       - name: Build Debug APK
         run: ./gradlew assembleDebug
 
+      # Release Steps (Only run if a tag starting with 'v' is pushed)
       - name: Rename APK with Version Tag
+        if: startsWith(github.ref, 'refs/tags/v')
         run: |
           VERSION_TAG="${{ github.ref_name }}"
           mkdir -p output
           find app/build/outputs/apk/debug -name "*.apk" -exec cp {} output/daybell-${VERSION_TAG}.apk \;
 
       - name: Upload APK to Release
+        if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
           files: output/daybell-${{ github.ref_name }}.apk
