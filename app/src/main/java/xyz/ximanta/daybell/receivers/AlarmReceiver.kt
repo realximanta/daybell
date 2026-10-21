@@ -8,7 +8,6 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import xyz.ximanta.daybell.data.local.AppDatabase
-import xyz.ximanta.daybell.data.local.Reminder
 import xyz.ximanta.daybell.reminders.AlarmScheduler
 import xyz.ximanta.daybell.reminders.NotificationHelper
 import java.util.Calendar
@@ -34,10 +33,17 @@ class AlarmReceiver : BroadcastReceiver() {
             try {
                 when (action) {
                     ACTION_DONE -> {
-                        // Mark task complete in DB
+                        // 1. Mark task complete in DB
                         db.taskDao().setTaskCompletion(taskId, true)
-                        // Cancel notification
+                        
+                        // 2. Cancel the current notification
                         notificationHelper.cancelNotification(reminderId)
+                        
+                        // 3. Cancel ALL future alarms for this task (Fixes P1 bug)
+                        val allReminders = db.reminderDao().getRemindersForTaskSync(taskId)
+                        for (r in allReminders) {
+                            alarmScheduler.cancel(r.id)
+                        }
                     }
 
                     ACTION_SNOOZE -> {
