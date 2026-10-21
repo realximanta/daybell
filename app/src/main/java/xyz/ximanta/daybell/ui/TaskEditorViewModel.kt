@@ -14,6 +14,7 @@ import xyz.ximanta.daybell.data.local.CategoryDao
 import xyz.ximanta.daybell.data.local.Reminder
 import xyz.ximanta.daybell.data.local.Task
 import xyz.ximanta.daybell.data.preferences.SettingsDataStore
+import xyz.ximanta.daybell.data.preferences.UserPreferences
 import xyz.ximanta.daybell.data.repository.TaskRepository
 
 data class TaskEditorState(
@@ -45,6 +46,14 @@ class TaskEditorViewModel(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5000),
             initialValue = emptyList()
+        )
+
+    // FIXED: Exposed userPreferences so the UI can respect 24-hour format and default snooze
+    val userPreferences: StateFlow<UserPreferences> = settingsDataStore.userPreferencesFlow
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = UserPreferences()
         )
 
     private var existingReminders: List<Reminder> = emptyList()
@@ -83,7 +92,7 @@ class TaskEditorViewModel(
                 }
             } else {
                 // New task mode
-                // FIXED: Clear existing reminders to prevent ID reuse from the previously edited task
+                // Clear existing reminders to prevent ID reuse from the previously edited task
                 existingReminders = emptyList()
                 
                 val prefs = settingsDataStore.userPreferencesFlow.first()
@@ -167,7 +176,7 @@ class TaskEditorViewModel(
                 isCompleted = false
             )
 
-            // FIXED: Always pass id = 0 to ensure the repository generates a fresh reminder ID
+            // Always pass id = 0 to ensure the repository generates a fresh reminder ID
             val reminder = Reminder(
                 id = 0,
                 taskId = task.id,
