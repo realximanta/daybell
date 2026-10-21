@@ -48,7 +48,7 @@
             android:enabled="true"
             android:exported="false" />
 
-        <!-- Receiver for system events (Reboot, Time change, App update) -->
+        <!-- Receiver for system events (Reboot, Time change, App update, Exact Alarm Permission change) -->
         <receiver
             android:name=".receivers.SystemEventReceiver"
             android:enabled="true"
@@ -58,6 +58,8 @@
                 <action android:name="android.intent.action.TIME_SET" />
                 <action android:name="android.intent.action.TIMEZONE_CHANGED" />
                 <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+                <!-- FIXED: Added action to listen for exact alarm permission changes -->
+                <action android:name="android.app.action.SCHEDULE_EXACT_ALARM_PERMISSION_STATE_CHANGED" />
             </intent-filter>
         </receiver>
 
