@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<full-backup-content>
+    <!-- 
+        We are using local backup/export via the Storage Access Framework (SAF).
+        Standard Android auto-backup can be enabled here for the Room database 
+        and DataStore preferences.
+    -->
+    <include domain="database" path="." />
+    <include domain="sharedpref" path="." />
+</full-backup-content>
